@@ -1,9 +1,23 @@
 import telebot
 import settings
+import os
+
 from mcrcon import MCRcon
-from telebot import types
 
 bot = telebot.TeleBot(settings.token)
+
+def record_user_data(prise, selectLevel):
+    if not os.path.isdir('userdata'):
+        os.mkdir('UserData')
+    prevDir = os.getcwd()
+    os.chdir('UserData')
+    data = open('Data.txt','w')
+    data.write(selectLevel +' '+ prise)
+    data.close()
+    if os.path.isfile(f'{nickname}.txt'):
+        os.remove(f'{nickname}.txt')
+    os.rename('Data.txt',f'{nickname}.txt')
+    os.chdir(prevDir)
 
 @bot.message_handler(content_types=['text'])
 def donate(message):
@@ -16,34 +30,25 @@ def donate(message):
 def get_nickname(message):
     global nickname
     nickname = message.text
-    keyboard = types.InlineKeyboardMarkup()
-    key_vip = types.InlineKeyboardButton(text='Уровень 1', callback_data='vip')
-    keyboard.add(key_vip)
-    key_prem = types.InlineKeyboardButton(text='Уровень 2', callback_data='prem')
-    keyboard.add(key_prem)
-    key_premplus = types.InlineKeyboardButton(text='Уровень 3', callback_data='premplus')
-    keyboard.add(key_premplus)
-    key_global = types.InlineKeyboardButton(text='Уровень 4', callback_data='global')
-    keyboard.add(key_global)
-    key_sponsor = types.InlineKeyboardButton(text='Уровень 5', callback_data='sponsor')
-    keyboard.add(key_sponsor)
-    bot.send_message(message.from_user.id, f'Ваш ник {nickname}. Укажите желаемый урвоень привилегии.', reply_markup=keyboard)
-    bot.register_next_step_handler_by_chat_id(message.chat.id, callback_worker)
+    bot.send_message(message.from_user.id, f'Ваш ник {nickname}. Укажите желаемый урвоень привилегии.')
+    bot.register_next_step_handler_by_chat_id(message.chat.id, get_level)
 
-@bot.callback_query_handler(func=lambda call: True)
-def callback_worker(call):
-    mc = MCRcon(settings.ip, settings.password, port=25575)
-    mc.connect()
-    if call.data == "vip":
-        mc.command(f'lp user {nickname} group set vip')
-    if call.data == "prem":
-        mc.command(f'lp user {nickname} group set prem')
-    if call.data == "premplus":
-        mc.command(f'lp user {nickname} group set premplus')
-    if call.data == "global":
-        mc.command(f'lp user {nickname} group set global')
-    if call.data == "sponsor":
-        mc.command(f'lp user {nickname} group set sponsor')
-    mc.disconnect()
+def get_level(message):
+        selectLevel = message.text
+        if selectLevel == '1' or selectLevel == '2' or selectLevel == '3' or selectLevel == '4' or selectLevel == '5':
+            prise = settings.level[int(selectLevel)]
+            record_user_data(prise, selectLevel)
+        else:
+            bot.send_message(message.from_user.id, 'Введите число 1...5')
+            bot.register_next_step_handler_by_chat_id(message.chat.id, get_level)
 
+'''mc = MCRcon(settings.ip, settings.password, port=25575)
+mc.connect()
+mc.command(f'lp user {nickname} group set vip')
+mc.command(f'lp user {nickname} group set prem')
+mc.command(f'lp user {nickname} group set premplus')
+mc.command(f'lp user {nickname} group set global')
+mc.command(f'lp user {nickname} group set sponsor')
+mc.disconnect()
+'''
 bot.polling(none_stop=True, interval=0, skip_pending=True)
