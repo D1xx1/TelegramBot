@@ -3,8 +3,10 @@ import settings
 import os
 
 from mcrcon import MCRcon
+from SimpleQIWI import *
 
 bot = telebot.TeleBot(settings.token)
+api = QApi(settings.qiwi_token, settings.qiwi_number)
 
 @bot.message_handler(content_types=['text'])
 def donate(message):
@@ -16,20 +18,50 @@ def donate(message):
         prevDir = os.getcwd()
         os.chdir('UserData')
         if os.path.isfile(f'{userID}.txt'):
-            '''Кусок кода, выполняющий проверку оплаты'''
+            '''Проверка оплаты'''
             bot.send_message(message.from_user.id, 'Запись найдена. Выполняется проверка.')
-            pass
+            with open(f'{userID}.txt', 'r') as userFile:
+                userFile = userFile.readlines()
+                commentUser = userFile[0].strip()
+                userLevel = userFile[1].strip()
+                amountUser = userFile[2].strip()
+            i = 0
+            while i != 20:
+                commentQiwi = api.payments['data'][i]['comment']
+                if commentQiwi == commentUser:
+                    print('совпадение')
+                    amountQiwi = api.payments['data'][i]['sum']['amount']
+                    if int(amountQiwi) == int(amountUser):
+                        mc = MCRcon(settings.ip, settings.password, port=25575)
+                        mc.connect()
+                        mc.command(f'say {commentUser} Получил уровень {userLevel}')
+                        mc.command(f'lp user {commentUser} group set {settings.priv[int(userLevel)]}')
+                        mc.disconnect()
+                        status = True
+                    break
+                else:
+                    print('Нет')
+                    i = i+1
+                    status = False
+            if status == True:
+                bot.send_message(userID, 'Оплата прошла успешно, привилегия выдана.')
+            elif status == False:
+                bot.send_message(userID, 'Ожидание оплаты.')
         else:
             bot.send_message(message.from_user.id, 'Запись не найдена.\nНапишите /donate и следуйте инструкции.')
         os.chdir(prevDir)
+    elif message.text == '/history':
+        i=0
+        print(api.payments['data'][i]['sum']['amount'])
     else:
         bot.send_message(message.from_user.id, 'Напишите /donate')
     
-def get_info(message):          #Этот куссок кода создаёт файл с записью данных.
+def get_info(message):
+        '''Создание записи данных о пользователе в файл'''
         nick_level = list(message.text.split('\n'))
         if len(nick_level) == 2:
             userID = message.from_user.id
-            bot.send_message(message.from_user.id, f'Ник: {nick_level[0]}. Желаемый уровень: {nick_level[1]}.\nК оплате {settings.level[int(nick_level[1])]} рублей.\nВ комментарии к платежу укажите: {userID}')
+            bot.send_message(message.from_user.id, f'Ник: {nick_level[0]}. Желаемый уровень: {nick_level[1]}.\nК оплате {settings.level[int(nick_level[1])]} рублей.\nВ комментарии к платежу укажите свой ник.')
             if not os.path.isdir('UserData'):
                 os.mkdir('UserData')
             prevDir = os.getcwd()
@@ -39,7 +71,7 @@ def get_info(message):          #Этот куссок кода создаёт �
             else:
                 os.chdir('UserData')
                 data = open('userinfo.txt','w')
-                data.write(nick_level[1]+'\n'+nick_level[0]+'\n'+settings.level[int(nick_level[1])])
+                data.write(nick_level[0]+'\n'+nick_level[1]+'\n'+settings.level[int(nick_level[1])])
                 data.close()
                 if os.path.isfile(f'{userID}.txt'):
                     os.remove(f'{userID}.txt')
@@ -51,13 +83,4 @@ def get_info(message):          #Этот куссок кода создаёт �
             bot.send_message(message.from_user.id, f'Ошибка ввода. Попробуйте снова.')
             bot.register_next_step_handler_by_chat_id(message.chat.id, get_info)
 
-'''mc = MCRcon(settings.ip, settings.password, port=25575)
-mc.connect()
-mc.command(f'lp user {nickname} group set vip')
-mc.command(f'lp user {nickname} group set prem')
-mc.command(f'lp user {nickname} group set premplus')
-mc.command(f'lp user {nickname} group set global')
-mc.command(f'lp user {nickname} group set sponsor')
-mc.disconnect()
-'''
 bot.polling(none_stop=True, interval=0, skip_pending=True)
