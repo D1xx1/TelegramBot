@@ -38,7 +38,10 @@ def donate(message):
                         mc.command(f'lp user {commentUser} group set {settings.priv[int(userLevel)]}')
                         mc.disconnect()
                         status = True
-                    break
+                        break
+                    elif int(amountQiwi) != int(amountUser):
+                        print('Сумма не соответствует. Продолжаем поиск.')
+                        i = i+1
                 else:
                     print('Нет')
                     i = i+1
